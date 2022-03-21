@@ -1,0 +1,95 @@
+import serial
+import time
+import speech_recognition as sr
+import pyaudio
+import wave
+import pygame
+import time
+
+def botvoice(botvoice):
+    pygame.mixer.init()
+    bang = pygame.mixer.Sound(botvoice)
+
+    bang.play()
+    time.sleep(2.8)
+
+
+def orderbot(RECORD_SECONDS,ANSWERTYPE):
+    CHUNK = 1024
+    FORMAT = pyaudio.paInt16
+    CHANNELS = 2
+    RATE = 44100
+    WAVE_OUTPUT_FILENAME = ANSWERTYPE+".wav"
+
+    p = pyaudio.PyAudio()
+
+    stream = p.open(format=FORMAT,
+                    channels=CHANNELS,
+                    rate=RATE,
+                    input=True,
+                    frames_per_buffer=CHUNK)
+
+    print("* recording")
+
+    frames = []
+
+    for i in range(0, int(RATE / CHUNK * RECORD_SECONDS)):
+        data = stream.read(CHUNK)
+        frames.append(data)
+
+    print("* done recording")
+
+    stream.stop_stream()
+    stream.close()
+    p.terminate()
+
+    wf = wave.open(WAVE_OUTPUT_FILENAME, 'wb')
+    wf.setnchannels(CHANNELS)
+    wf.setsampwidth(p.get_sample_size(FORMAT))
+    wf.setframerate(RATE)
+    wf.writeframes(b''.join(frames))
+    wf.close()
+
+
+    r = sr.Recognizer()
+    korean_audio = sr.AudioFile(ANSWERTYPE+".wav")
+    with korean_audio as source:
+        audio = r.record(source)
+    CustomerSay=r.recognize_google(audio_data=audio,language='ko-KR')
+    print(CustomerSay)
+    return CustomerSay
+
+
+py_serial = serial.Serial(
+    port='/dev/ttyACM1',
+    baudrate=9600
+)
+
+while True:
+    commend = input('table number:')
+    
+    py_serial.write(commend.encode())
+    
+    time.sleep(0.1)
+    a = 1
+    while a==1:
+        if py_serial.readable():
+            response = py_serial.readline()
+            text = response[:len(response)-1].decode()
+            text = text.strip()
+            print(text)
+            if  text=="arrived table":
+                botvoice("hi.wav")
+                yesno=orderbot(5,"yesno")
+                if  "아니요" in yesno or "괜찮아요" in yesno or "아니" in yesno:                             
+                    botvoice("bye.wav")
+                    py_serial.write("0".encode())
+                    py_serial.write(commend.encode())
+                    time.sleep(0.1)
+                else:
+                    botvoice("orderbot.wav")
+                    order=orderbot(15,"order")
+                    # print("") 여기에다 안드로이드로 보내는 코드 쓰기
+            elif text=="home":
+                a=2
+
